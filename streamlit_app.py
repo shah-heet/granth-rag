@@ -11,10 +11,6 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.chat_models import ChatOpenAI
 
-
-load_dotenv()
-os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
-
 def loading_pdf_and_embedding(file_path,db_path):
     #Text extraction form pdf    
     reader = PdfReader(file_path)
@@ -39,8 +35,6 @@ def loading_pdf_and_embedding(file_path,db_path):
     #embed and store
     embedding = OpenAIEmbeddings(model="text-embedding-3-large")
     vectordb = Chroma.from_texts(texts=chunks,embedding=embedding,persist_directory=db_path)  
-
-
 
 def get_answer(query):
     # Load the persisted vector store
@@ -77,31 +71,37 @@ def get_answer(query):
 
 #Streamlit code
 # Title
-st.markdown("<h1 style='text-align: center;'>GRANTH-RAG</h1>", unsafe_allow_html=True)
-st.markdown("<h6 style='text-align: center;'>Here you can question-answer on your religious 📄 document</h6>", unsafe_allow_html=True)
+openai_api_key = st.text_input("OpenAI API Key", type="password")
+if not openai_api_key:
+    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
+else:
+    os.environ['OPENAI_API_KEY'] = openai_api_key
 
-uploaded_file = st.file_uploader("Upload your document here (.pdf)", type="pdf")
+    st.markdown("<h1 style='text-align: center;'>GRANTH-RAG</h1>", unsafe_allow_html=True)
+    st.markdown("<h6 style='text-align: center;'>Here you can question-answer on your religious 📄 document</h6>", unsafe_allow_html=True)
 
-save_path = "File"
-specific_filename = "granth-rag.pdf"
+    uploaded_file = st.file_uploader("Upload your document here (.pdf)", type="pdf")
 
-if uploaded_file:
-    # Save the uploaded file to the specified path
-    file_path = os.path.join(save_path, specific_filename)
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    
-    
-    file_path = 'File/granth-rag.pdf'
-    db_path = 'chroma_db'
-    
-    loading_pdf_and_embedding(file_path,db_path)
+    save_path = "File"
+    specific_filename = "granth-rag.pdf"
 
-question = st.text_input("Ask a question")
+    if uploaded_file:
+        # Save the uploaded file to the specified path
+        file_path = os.path.join(save_path, specific_filename)
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        
+        file_path = 'File/granth-rag.pdf'
+        db_path = 'chroma_db'
+        
+        loading_pdf_and_embedding(file_path,db_path)
 
-if st.button("Submit"):
-    if question:
-        answer = get_answer(question)
-        st.write(answer)
-    else:
-        st.write("Please upload a PDF and enter a question.")
+    question = st.text_input("Ask a question")
+
+    if st.button("Submit"):
+        if question:
+            answer = get_answer(question)
+            st.write(answer)
+        else:
+            st.write("Please upload a PDF and enter a question.")
