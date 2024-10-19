@@ -71,14 +71,13 @@ def get_answer(query):
 
 #Streamlit code
 # Title
+st.markdown("<h1 style='text-align: center;'>GRANTH-RAG</h1>", unsafe_allow_html=True)
+st.markdown("<h6 style='text-align: center;'>Here you can question-answer on your religious 📄 document</h6>", unsafe_allow_html=True)
 openai_api_key = st.text_input("OpenAI API Key", type="password")
 if not openai_api_key:
     st.info("Please add your OpenAI API key to continue.", icon="🗝️")
 else:
     os.environ['OPENAI_API_KEY'] = openai_api_key
-
-    st.markdown("<h1 style='text-align: center;'>GRANTH-RAG</h1>", unsafe_allow_html=True)
-    st.markdown("<h6 style='text-align: center;'>Here you can question-answer on your religious 📄 document</h6>", unsafe_allow_html=True)
 
     uploaded_file = st.file_uploader("Upload your document here (.pdf)", type="pdf")
 
