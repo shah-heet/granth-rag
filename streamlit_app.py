@@ -1,19 +1,22 @@
-import streamlit as st
-from openai import OpenAI
-
-
-# # # # # # #
 import os
+import streamlit as st
 from dotenv import load_dotenv
-load_dotenv()
+from PyPDF2 import PdfReader
+from langchain_text_splitters import RecursiveCharacterTextSplitter 
+from langchain.vectorstores import Chroma
+from langchain.embeddings import OpenAIEmbeddings   
+from langchain.vectorstores import Chroma # needed when we run this function in a separate cell
+from langchain.embeddings import OpenAIEmbeddings   
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain.chat_models import ChatOpenAI
 
+
+load_dotenv()
 os.environ['OPENAI_API_KEY']=os.getenv("OPENAI_API_KEY")
 
 def loading_pdf_and_embedding(file_path,db_path):
-    #Text extraction form pdf
-    from PyPDF2 import PdfReader    
-
-    ##file_path = save_path+"/granth-rag.pdf"
+    #Text extraction form pdf    
     reader = PdfReader(file_path)
     text = ""
     #for page in reader.pages:
@@ -29,31 +32,24 @@ def loading_pdf_and_embedding(file_path,db_path):
     #print(text)    
 
     #chunking
-    from langchain_text_splitters import RecursiveCharacterTextSplitter 
-
     text_splitter=RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap = 50)
     chunks=text_splitter.split_text(text)
-    #chunks 
+
 
     #embed and store
-    from langchain.vectorstores import Chroma
-    from langchain.embeddings import OpenAIEmbeddings   
-
     embedding = OpenAIEmbeddings(model="text-embedding-3-large")
-    vectordb= Chroma.from_texts(texts=chunks,embedding=embedding,persist_directory=db_path)  
+    vectordb = Chroma.from_texts(texts=chunks,embedding=embedding,persist_directory=db_path)  
 
 
 
 def get_answer(query):
-    from langchain.vectorstores import Chroma # needed when we run this function in a separate cell
-    from langchain.embeddings import OpenAIEmbeddings   
     # Load the persisted vector store
     vectordbt = Chroma(persist_directory=db_path, embedding_function=OpenAIEmbeddings(model="text-embedding-3-large"))
     
 
     docs = vectordbt.similarity_search(query)
 
-    from langchain.prompts import PromptTemplate
+    
     prompt_template = PromptTemplate(
         input_variables = ['query','context'],
         template="""You are an expert assistant for question-answering.
@@ -71,8 +67,7 @@ def get_answer(query):
     """
     )
     
-    from langchain.chains import LLMChain
-    from langchain.chat_models import ChatOpenAI
+
     llm = ChatOpenAI(model='gpt-4o-mini',temperature=0,max_tokens=200)#
     chain = LLMChain(llm=llm, prompt=prompt_template)
 
@@ -80,19 +75,15 @@ def get_answer(query):
 
 # # # # # # #
 
-
-import streamlit as st
-from openai import OpenAI
-
+#Streamlit code
 # Title
 st.markdown("<h1 style='text-align: center;'>GRANTH-RAG</h1>", unsafe_allow_html=True)
 st.markdown("<h6 style='text-align: center;'>Here you can question-answer on your religious 📄 document</h6>", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("Upload your document here (.pdf)", type="pdf")
 
-save_path = "/Users/anandmaurya/Desktop/Cilans/PDF_RAG/granth-rag/File"
+save_path = "File"
 specific_filename = "granth-rag.pdf"
-import os
 
 if uploaded_file:
     # Save the uploaded file to the specified path
@@ -101,8 +92,8 @@ if uploaded_file:
         f.write(uploaded_file.getbuffer())
     
     
-    file_path = '/Users/anandmaurya/Desktop/Cilans/PDF_RAG/granth-rag/File/granth-rag.pdf'
-    db_path = '/Users/anandmaurya/Desktop/Cilans/PDF_RAG/granth-rag/chroma_db'
+    file_path = 'File/granth-rag.pdf'
+    db_path = 'chroma_db'
     
     loading_pdf_and_embedding(file_path,db_path)
 
