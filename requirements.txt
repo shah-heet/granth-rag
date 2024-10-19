@@ -1,2 +1,7 @@
 streamlit
 openai
+python-dotenv
+pypdf2
+chromadb
+langchain
+langchain-community
