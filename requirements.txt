@@ -5,3 +5,5 @@ pypdf2
 chromadb
 langchain
 langchain-community
+tiktoken
+langchain_openai
