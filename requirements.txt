@@ -6,3 +6,4 @@ chromadb
 langchain
 langchain-community
 faiss-cpu
+tiktoken
