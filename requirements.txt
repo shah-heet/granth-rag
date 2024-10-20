@@ -5,3 +5,4 @@ pypdf2
 chromadb
 langchain
 langchain-community
+faiss-cpu
