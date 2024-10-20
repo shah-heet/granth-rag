@@ -1,106 +1,139 @@
 import os
+import time
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter 
-from langchain.vectorstores import Chroma
-from langchain.embeddings import OpenAIEmbeddings   
-from langchain.vectorstores import Chroma # needed when we run this function in a separate cell
-from langchain.embeddings import OpenAIEmbeddings   
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings   
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
+import shutil  # Import shutil to remove the directory
 
-def loading_pdf_and_embedding(file_path,db_path):
-    #Text extraction form pdf    
-    reader = PdfReader(file_path)
-    text = ""
-    #for page in reader.pages:
-    #    text += page.extract_text()    
+# Function to load and embed text from a PDF
+def load_and_embed_pdf(uploaded_file, db_path):
+    try:
+        start_time = time.time()
+        # Text extraction from PDF
+        reader = PdfReader(uploaded_file)
+        text = ""
 
-    start_page = 13  
-    end_page = 18   
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+        if not text:
+            st.error("No text extracted from the document.")
+            return False
 
-    for page_num in range(start_page, end_page + 1):
-        page = reader.pages[page_num]
-        text += page.extract_text() 
+        # Text chunking for embeddings
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=50)
+        chunks = text_splitter.split_text(text)
 
-    #print(text)    
+        # Embed and store using Chroma
+        embedding = OpenAIEmbeddings(model="text-embedding-3-small")
+        vectordb = Chroma.from_texts(texts=chunks, embedding=embedding, persist_directory=db_path)
+        embedding_time = time.time()
+        print(f"Total processing time: {embedding_time - start_time:.2f} seconds")
+        return True
+    except Exception as e:
+        st.error(f"An error occurred while processing the PDF: {e}")
+        return False
 
-    #chunking
-    text_splitter=RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap = 50)
-    chunks=text_splitter.split_text(text)
+# Function to retrieve answers based on a query
+def get_answer(query, db_path):
+    try:
+        # Load the persisted vector store
+        vectordb = Chroma(persist_directory=db_path, embedding_function=OpenAIEmbeddings(model="text-embedding-3-small"))
+        docs = vectordb.similarity_search(query, k=15)  # Adjust 'k' to limit the number of retrieved documents
+
+        # Create a prompt template for generating the response
+        prompt_template = PromptTemplate(
+            input_variables=['query', 'context'],
+            template="""You are an expert assistant for question-answering.
+            Here, a context related to religious documents like holy books, stories, prayers, or research papers will be provided.
+            Your task is to read, understand, and analyze the context before answering the question.
+            Feel free to provide concise, human-friendly, and clear answers.
+
+            Note: If you don't know the answer, just say that you don't know. Don't make assumptions.
+
+            Given the context below, answer the question:
+            Context: {context}
+            Question: {query}
+            Answer:"""
+        )
+        
+        # Initialize the LLM with the appropriate model and parameters
+        llm = ChatOpenAI(model='gpt-4o', temperature=0, max_tokens=200)
+        chain = LLMChain(llm=llm, prompt=prompt_template)
+        context = "\n\n".join([doc.page_content for doc in docs])
+
+        # Generate the answer
+        return docs, chain.run(query=query, context=context)
+    except Exception as e:
+        st.error(f"An error occurred while retrieving the answer: {e}")
+        docs = []
+        return docs, "Unable to process the request."
+
+def remove_chroma_db(db_path):
+        try:
+            if os.path.exists(db_path):
+                shutil.rmtree(db_path)
+                print("Chroma database removed.")
+                return True
+        except PermissionError:
+            print("Attempt: Unable to remove the Chroma database. It may be in use.")
+            return False
 
 
-    #embed and store
-    embedding = OpenAIEmbeddings(model="text-embedding-3-large")
-    vectordb = Chroma.from_texts(texts=chunks,embedding=embedding,persist_directory=db_path)  
-
-def get_answer(query):
-    # Load the persisted vector store
-    vectordbt = Chroma(persist_directory=db_path, embedding_function=OpenAIEmbeddings(model="text-embedding-3-large"))
-    
-
-    docs = vectordbt.similarity_search(query)
-
-    
-    prompt_template = PromptTemplate(
-        input_variables = ['query','context'],
-        template="""You are an expert assistant for question-answering.
-        Here in context religious document will be provided to you it can be any religious holybook,story , prayer ,research paper.
-        your job is to read , understand and analyze the context before answering the question.
-        user will ask u questions about the context and you have to answer them.
-        feel free to answer the question briefly if needed, just Keep the answer human friendly,clear and to the point.
-
-        Note : If you don't know the answer, just say that you don't know. Don't make assumptions.
-
-        Given the context below,answer the question:\n\n
-        Context: {context}\n\n
-        Question: {question}\n\n
-        Answer:
-    """
-    )
-    
-
-    llm = ChatOpenAI(model='gpt-4o-mini',temperature=0,max_tokens=200)#
-    chain = LLMChain(llm=llm, prompt=prompt_template)
-
-    return chain.run(question=query, context=docs)
-
-# # # # # # #
-
-#Streamlit code
-# Title
+# Streamlit UI
 st.markdown("<h1 style='text-align: center;'>GRANTH-RAG</h1>", unsafe_allow_html=True)
-st.markdown("<h6 style='text-align: center;'>Here you can question-answer on your religious 📄 document</h6>", unsafe_allow_html=True)
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
-    os.environ['OPENAI_API_KEY'] = st.secrets["OPENAI_API_KEY"]
+st.markdown("<h6 style='text-align: center;'>Here you can ask questions about your religious documents</h6>", unsafe_allow_html=True)
 
-    uploaded_file = st.file_uploader("Upload your document here (.pdf)", type="pdf")
+uploaded_file = st.file_uploader("Upload your document here (.pdf)", type="pdf")
 
-    save_path = "File"
-    specific_filename = "granth-rag.pdf"
+os.environ['OPENAI_API_KEY'] = st.secrets["OPENAI_API_KEY"]
+# Define the file paths
+save_path = "File"
+specific_filename = "granth-rag.pdf"
+file_path = os.path.join(save_path, specific_filename)
+db_path = 'chroma_db'
 
-    if uploaded_file:
-        # Save the uploaded file to the specified path
-        file_path = os.path.join(save_path, specific_filename)
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        
-        file_path = 'File/granth-rag.pdf'
-        db_path = 'chroma_db'
-        
-        loading_pdf_and_embedding(file_path,db_path)
+# Initialize session state for processing flag
+if 'pdf_processed' not in st.session_state:
+    st.session_state.pdf_processed = False
 
-    question = st.text_input("Ask a question")
+# Save the uploaded file and process it
+if uploaded_file:
+    # Remove the existing Chroma database if it exists
+    # if os.path.exists(db_path):
+    #     remove_chroma_db(db_path)
 
-    if st.button("Submit"):
+    # os.makedirs(save_path, exist_ok=True)
+    # with open(file_path, "wb") as f:
+    #     f.write(uploaded_file.getbuffer())
+    
+    st.info("Processing the uploaded PDF...")
+    success = load_and_embed_pdf(uploaded_file, db_path)
+    
+    if success:
+        st.session_state.pdf_processed = True  # Set the flag to true
+        st.success("PDF processed and embedded successfully. You can now ask questions.")
+    else:
+        st.error("Failed to process the PDF. Please check the document format or page range.")
+
+# Get user input for a question
+question = st.text_input("Ask a question", placeholder="Type your question here...")
+
+# Handle the submission of the question
+if st.button("Submit"):
+    if st.session_state.pdf_processed:  # Only allow question submission if PDF is processed
         if question:
-            answer = get_answer(question)
+            docs, answer = get_answer(question, db_path)
+            print(docs)
             st.write(answer)
         else:
-            st.write("Please upload a PDF and enter a question.")
+            st.warning("Please enter a question to proceed.")
+    else:
+        st.warning("Please upload and process a PDF file first.")
