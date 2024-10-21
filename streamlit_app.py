@@ -21,7 +21,7 @@ def loading_pdf_and_embedding(file_path, db_path):
     chunks = text_splitter.split_text(text)
 
     # Embedding
-    embedding = OpenAIEmbeddings(model="text-embedding-3-small")
+    embedding = OpenAIEmbeddings(model="text-embedding-3-large")
     # Creating FAISS index and saving
     vectordb = FAISS.from_texts(texts=chunks, embedding=embedding)
     vectordb.save_local(db_path)
@@ -30,33 +30,37 @@ def loading_pdf_and_embedding(file_path, db_path):
 
 def get_answer(query, db_path):
     # Load the FAISS index
-    vectordbt = FAISS.load_local(db_path, OpenAIEmbeddings(model="text-embedding-3-small"), allow_dangerous_deserialization=True)
+    vectordbt = FAISS.load_local(db_path, OpenAIEmbeddings(model="text-embedding-3-large"), allow_dangerous_deserialization=True)
     docs = vectordbt.similarity_search(query)
 
     # Define the prompt template
     prompt_template = PromptTemplate(
-        input_variables=['context', 'query'],
-        template="""You are an expert assistant for question-answering.
-        Here in context religious document will be provided to you it can be any religious holybook, story, prayer, or research paper.
-        Your job is to read, understand, and analyze the context before answering the question.
-        Feel free to answer the question briefly if needed. Keep the answer human-friendly, clear, and to the point.
+        input_variables=['question', 'context'],
+        template="""
+        You are an expert assistant specializing in question-answering. The provided context will be from religious texts such as holy books, stories, prayers, or research papers.
 
-        Note: If you don't know the answer, just say that you don't know. Don't make assumptions.
+        Your task is to carefully read, understand, and analyze the given context before responding to the user's questions. Ensure your answers are accurate, concise, and human-friendly, while remaining clear and to the point.
 
-        Given the context below, answer the question:\n\n
-        Context: {context}\n\n
-        Question: {query}\n\n
+        Important:
+        - If you don't know the answer, simply state, "I don't know." Do not make assumptions or fabricate responses.
+
+        Based on the context provided below, answer the question:
+
+        Context: {context}
+
+        Question: {question}
+
         Answer:
-    """
+        """
     )
 
-    llm = ChatOpenAI(model='gpt-4', temperature=0, max_tokens=200)
+    llm = ChatOpenAI(model='gpt-4o-mini', temperature=0, max_tokens=1000)
     chain = LLMChain(llm=llm, prompt=prompt_template)
 
     # Combine the docs into a single context string
     context = "\n\n".join([doc.page_content for doc in docs])
 
-    return chain.run(query=query, context=context)
+    return chain.run(question=question, context=context)
 
 # Streamlit code
 # Title
