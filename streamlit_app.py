@@ -35,7 +35,7 @@ def get_answer(query, db_path):
 
     # Define the prompt template
     prompt_template = PromptTemplate(
-        input_variables=['query', 'context'],
+        input_variables=['question', 'context'],
         template="""
         You are an expert assistant specializing in question-answering. The provided context will be from religious texts such as holy books, stories, prayers, or research papers.
 
@@ -60,7 +60,7 @@ def get_answer(query, db_path):
     # Combine the docs into a single context string
     context = "\n\n".join([doc.page_content for doc in docs])
 
-    return chain.run(query=query, context=context)
+    return chain.run(question=question, context=context)
 
 # Streamlit code
 # Title
