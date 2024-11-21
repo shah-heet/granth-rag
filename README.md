@@ -1,6 +1,6 @@
-# 📄 Document Question Answering Template
+# 📄 GranthRAG - Preserving and Leveraging Ancient Indian Knowledge
 
-A simple Streamlit app that answers questions about an uploaded document using OpenAI's GPT-3.5.
+A hosted Streamlit app that answers questions about our ancient granths.
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://rag-granth.streamlit.app/)
 
